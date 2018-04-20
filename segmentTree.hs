@@ -1,44 +1,28 @@
-data Range = Range Int Int deriving (Eq, Show)
+data SegTree m = Leaf m | Node m (SegTree m) (SegTree m) deriving (Eq, Show)
 
-getLeft (Range l _) = l
-atom (Range l r) = l == r
-include (Range l1 r1) (Range l2 r2) = l1 <= l2 && r2 <= r1
-disjoint (Range l1 r1) (Range l2 r2) = r1 < l2 || r2 < l1
-splitRange (Range l r) = (Range l r1, Range (r1 + 1) r)
-  where r1 = (r + l) `div` 2
+val :: SegTree m -> m
+val (Leaf x) = x
+val (Node x _ _) = x
 
-splitList xs = splitAt ((1 + length xs) `div` 2) xs
+fromList' :: Semigroup a => Int -> [a] -> SegTree a
+fromList' 1 [x] = Leaf x
+fromList' n xs = Node (val left <> val right) left right
+  where
+    m = n `div` 2
+    (lxs, rxs) = splitAt m xs
+    left = fromList' m lxs
+    right = fromList' (n - m) rxs
 
-data SegTree a = Empty | Node {
-    left :: SegTree a,
-    right :: SegTree a,
-    getRange :: Range,
-    getValue :: a
-  } deriving Show
+fromList :: Semigroup a => [a] -> (Int, SegTree a)
+fromList xs = (size, fromList' size xs)
+  where size = length xs
 
-getValIn :: (a -> a -> a) -> Range -> SegTree a -> a
-getValIn fn range (Node leftTree rightTree treeRange value)
-  | range `include` treeRange = value
-  | disjoint leftRange range = rightVal
-  | disjoint rightRange range = leftVal
-  | otherwise = fn leftVal rightVal
+query :: Semigroup a => (Int, SegTree a) -> (Int, Int) -> a
+query (n, (Leaf x)) range = x
+query (n, (Node x left right)) (i, j)
+  | (i, j) == (1, n) = x
+  | j <= m = query (m, left) (i, j)
+  | i > m = query ((n - m), right) (i - m, j - m)
+  | otherwise = query (m, left) (i, m) <> query ((n - m), right) (1, j - m)
     where
-      leftRange = getRange leftTree
-      rightRange = getRange rightTree
-      leftVal = getValIn fn range leftTree
-      rightVal = getValIn fn range rightTree
-
-buildSegTree' :: (a -> a -> a) -> Range -> [a] -> SegTree a
-buildSegTree' fn range xs
-  | atom range = Node Empty Empty range (head xs)
-  | otherwise = Node leftTree rightTree range (fn leftVal rightVal)
-    where
-      (leftRange, rightRange) = splitRange range
-      (leftX, rightX) = splitList xs
-      leftTree = buildSegTree' fn leftRange leftX
-      rightTree = buildSegTree' fn rightRange rightX
-      leftVal = getValue leftTree
-      rightVal = getValue rightTree
-
-buildSegTree :: (a -> a -> a) -> [a] -> SegTree a
-buildSegTree fn xs = buildSegTree' fn (Range 1 (length xs)) xs
+      m = n `div` 2
