@@ -3,7 +3,7 @@
 
 binarySearch' :: Integral a => (a -> Bool) -> a -> a -> Maybe a
 binarySearch' compare l r
-  | r - l == 1 = Just l
+  | abs (r - l) == 1 = Just l
   | compare m = binarySearch' compare m r
   | otherwise = binarySearch' compare l m
     where
